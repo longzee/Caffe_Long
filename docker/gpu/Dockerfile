@@ -1,47 +1,134 @@
-FROM nvidia/cuda:8.0-cudnn6-devel-ubuntu16.04
-LABEL maintainer caffe-maint@googlegroups.com
+# ==================================================================
+# module list
+# ------------------------------------------------------------------
+# python        3.6    (apt)
+# opencv        latest (git)
+# caffe         latest (git)
+# ==================================================================
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+FROM nvidia/cuda:8.0-cudnn6-devel-ubuntu16.04
+RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
+    PIP_INSTALL="pip --no-cache-dir install --upgrade" && \
+    GIT_CLONE="git clone --depth 10" && \
+
+    rm -rf /var/lib/apt/lists/* \
+           /etc/apt/sources.list.d/cuda.list \
+           /etc/apt/sources.list.d/nvidia-ml.list && \
+
+    apt-get update && \
+
+# ==================================================================
+# tools
+# ------------------------------------------------------------------
+
+    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
         build-essential \
+        ca-certificates \
         cmake \
-        git \
         wget \
+        git \
+        vim \
+        && \
+
+# ==================================================================
+# python
+# ------------------------------------------------------------------
+
+    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
+        software-properties-common \
+        && \
+    add-apt-repository ppa:jonathonf/python-3.6 && \
+    apt-get update && \
+    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
+        python3.6 \
+        python3.6-dev \
+        && \
+    wget -O ~/get-pip.py \
+        https://bootstrap.pypa.io/get-pip.py && \
+    python3.6 ~/get-pip.py && \
+    ln -s /usr/bin/python3.6 /usr/local/bin/python3 && \
+    ln -s /usr/bin/python3.6 /usr/local/bin/python && \
+    $PIP_INSTALL \
+        setuptools \
+        && \
+    $PIP_INSTALL \
+        numpy \
+        scipy \
+        pandas \
+        scikit-learn \
+        matplotlib \
+        Cython \
+        && \
+
+# ==================================================================
+# boost
+# ------------------------------------------------------------------
+
+    wget -O ~/boost.tar.gz https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.gz && \
+    tar -zxf ~/boost.tar.gz -C ~ && \
+    cd ~/boost_* && \
+    ./bootstrap.sh --with-python=python3.6 && \
+    ./b2 install --prefix=/usr/local && \
+    ln -s /usr/local/lib/libboost_python3.so /usr/lib/x86_64-linux-gnu/libboost_python36.so && \
+
+# ==================================================================
+# opencv
+# ------------------------------------------------------------------
+
+    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
         libatlas-base-dev \
-        libboost-all-dev \
         libgflags-dev \
         libgoogle-glog-dev \
         libhdf5-serial-dev \
         libleveldb-dev \
         liblmdb-dev \
-        libopencv-dev \
         libprotobuf-dev \
         libsnappy-dev \
         protobuf-compiler \
-        python-dev \
-        python-numpy \
-        python-pip \
-        python-setuptools \
-        python-scipy && \
-    rm -rf /var/lib/apt/lists/*
+        && \
 
-ENV CAFFE_ROOT=/opt/caffe
-WORKDIR $CAFFE_ROOT
+    $GIT_CLONE --branch 3.2.0 https://github.com/opencv/opencv ~/opencv && \
+    mkdir -p ~/opencv/build && cd ~/opencv/build && \
+    cmake -D CMAKE_BUILD_TYPE=RELEASE \
+          -D CMAKE_INSTALL_PREFIX=/usr/local \
+          -D WITH_IPP=OFF \
+          -D WITH_CUDA=OFF \
+          -D WITH_OPENCL=OFF \
+          -D BUILD_TESTS=OFF \
+          -D BUILD_PERF_TESTS=OFF \
+          .. && \
+    make -j"$(nproc)" install && \
 
-# FIXME: use ARG instead of ENV once DockerHub supports this
-# https://github.com/docker/hub-feedback/issues/460
-ENV CLONE_TAG=1.0
+# ==================================================================
+# caffe
+# ------------------------------------------------------------------
 
-RUN git clone -b ${CLONE_TAG} --depth 1 https://github.com/BVLC/caffe.git . && \
-    pip install --upgrade pip && \
-    cd python && for req in $(cat requirements.txt) pydot; do pip install $req; done && cd .. && \
-    git clone https://github.com/NVIDIA/nccl.git && cd nccl && make -j install && cd .. && rm -rf nccl && \
-    mkdir build && cd build && \
-    cmake -DUSE_CUDNN=1 -DUSE_NCCL=1 .. && \
-    make -j"$(nproc)"
+    $GIT_CLONE https://github.com/NVIDIA/nccl ~/nccl && \
+    cd ~/nccl && \
+    make -j"$(nproc)" install && \
 
-ENV PYCAFFE_ROOT $CAFFE_ROOT/python
-ENV PYTHONPATH $PYCAFFE_ROOT:$PYTHONPATH
-ENV PATH $CAFFE_ROOT/build/tools:$PYCAFFE_ROOT:$PATH
-RUN echo "$CAFFE_ROOT/build/lib" >> /etc/ld.so.conf.d/caffe.conf && ldconfig
+    $GIT_CLONE https://github.com/longzee/Caffe_Long ~/caffe && \
+    cd ~/caffe && \
+    make clean && \
+    make -j"$(nproc)" -Wno-deprecated-gpu-targets distribute && \
 
-WORKDIR /workspace
+    # fix ValueError caused by python-dateutil 1.x
+    sed -i 's/,<2//g' ~/caffe/python/requirements.txt && \
+
+    $PIP_INSTALL \
+        -r ~/caffe/python/requirements.txt && \
+
+    cd ~/caffe/distribute/bin && \
+    for file in *.bin; do mv "$file" "${file%%.bin}"; done && \
+    cd ~/caffe/distribute && \
+    cp -r bin include lib proto /usr/local/ && \
+    cp -r python/caffe /usr/local/lib/python3.6/dist-packages/ && \
+
+# ==================================================================
+# config & cleanup
+# ------------------------------------------------------------------
+
+    ldconfig && \
+    apt-get clean && \
+    apt-get autoremove && \
+    rm -rf /var/lib/apt/lists/* /tmp/*
