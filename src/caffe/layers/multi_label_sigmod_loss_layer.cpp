@@ -115,7 +115,7 @@ void MultiLabelSigmoidLossLayer<Dtype>::Backward_cpu(
 
 #ifdef CPU_ONLY
 //STUB_GPU_BACKWARD(MultiLabelSigmoidLossLayer, Backward);
-STUB_GPU(MultiLabelSigmoidLossLayer);
+//STUB_GPU(MultiLabelSigmoidLossLayer);
 #endif
 
 INSTANTIATE_CLASS(MultiLabelSigmoidLossLayer);
