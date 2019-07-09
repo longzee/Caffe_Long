@@ -197,9 +197,9 @@ void KnowledgeDistillationLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>&
 }
 
 
-//#ifdef CPU_ONLY
-//STUB_GPU(KnowledgeDistillationLayer);
-//#endif
+#ifdef CPU_ONLY
+STUB_GPU(KnowledgeDistillationLayer);
+#endif
 
 INSTANTIATE_CLASS(KnowledgeDistillationLayer);
 REGISTER_LAYER_CLASS(KnowledgeDistillation);

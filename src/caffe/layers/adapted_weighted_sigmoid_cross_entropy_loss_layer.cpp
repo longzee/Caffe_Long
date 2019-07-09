@@ -116,7 +116,8 @@ void AdaptedWeightedSigmoidCrossEntropyLossLayer<Dtype>::Backward_cpu(
 }
 
 #ifdef CPU_ONLY
-STUB_GPU_BACKWARD(AdaptedWeightedSigmoidCrossEntropyLossLayer, Backward);
+// STUB_GPU_BACKWARD(AdaptedWeightedSigmoidCrossEntropyLossLayer, Backward);
+STUB_GPU(AdaptedWeightedSigmoidCrossEntropyLossLayer);
 #endif
 
 INSTANTIATE_CLASS(AdaptedWeightedSigmoidCrossEntropyLossLayer);
