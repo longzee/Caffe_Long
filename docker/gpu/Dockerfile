@@ -2,7 +2,7 @@
 # module list
 # ------------------------------------------------------------------
 # python        3.6    (apt)
-# opencv        latest (git)
+# opencv        3.2.0 (git)
 # caffe         latest (git)
 # ==================================================================
 
@@ -107,22 +107,22 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     cd ~/nccl && \
     make -j"$(nproc)" install && \
 
-    $GIT_CLONE https://github.com/longzee/Caffe_Long ~/caffe && \
-    cd ~/caffe && \
+    $GIT_CLONE https://github.com/longzee/Caffe_Long /opt/caffe && \
+    cd /opt/caffe && \
     make clean && \
     make -j"$(nproc)" -Wno-deprecated-gpu-targets distribute && \
 
     # fix ValueError caused by python-dateutil 1.x
-    sed -i 's/,<2//g' ~/caffe/python/requirements.txt && \
+    sed -i 's/,<2//g' /opt/caffe/python/requirements.txt && \
 
     $PIP_INSTALL \
-        -r ~/caffe/python/requirements.txt && \
+        -r /opt/caffe/python/requirements.txt && \
 
-    cd ~/caffe/distribute/bin && \
+    cd /opt/caffe/distribute/bin && \
     for file in *.bin; do mv "$file" "${file%%.bin}"; done && \
-    cd ~/caffe/distribute && \
-    cp -r bin include lib proto /usr/local/ && \
-    cp -r python/caffe /usr/local/lib/python3.6/dist-packages/ && \
+    # cd /opt/caffe/distribute && \
+    # cp -r bin include lib proto /usr/local/ && \
+    # cp -r python/caffe /usr/local/lib/python3.6/dist-packages/ && \
 
 # ==================================================================
 # config & cleanup
@@ -131,4 +131,4 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
     ldconfig && \
     apt-get clean && \
     apt-get autoremove && \
-    rm -rf /var/lib/apt/lists/* /tmp/*
+    rm -rf /var/lib/apt/lists/* /tmp/* ~/*
